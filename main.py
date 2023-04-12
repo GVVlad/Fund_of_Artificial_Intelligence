@@ -1,142 +1,61 @@
+import random
 import numpy as np
-import pandas as pd
 
-import matplotlib.pyplot as plt
-from sklearn.cluster import MeanShift, estimate_bandwidth, KMeans
-from sklearn import metrics
+from deap import base, creator, tools, algorithms
 
 
-def clusteringByKmeans(Data, num_clusters):
-    plt.figure()
-    plt.scatter(Data[:, 0], Data[:, 1], marker="o", facecolors="none",
-                edgecolors="black", s=80)
-    x_min, x_max = Data[:, 0].min() - 1, Data[:, 0].max() + 1
-    y_min, y_max = Data[:, 1].min() - 1, Data[:, 1].max() + 1
-    plt.title("Вхідні Дані")
-    plt.xlim(x_min, x_max)
-    plt.ylim(y_min, y_max)
-    plt.xticks(())
-    plt.yticks(())
+CHROMOSOME_LENGTH = 3
+POPULATION_SIZE = 450
+P_CROSSOVER = 0.4
+P_MUTATION = 0.2
+MAX_GENERATIONS = 60
+HALL_OF_FAME_SIZE = 1
+RANDOM_SEED = 7
 
-    kmeans = KMeans(init="k-means++", n_clusters=num_clusters, n_init=10)
+def eval_func(individual):
+    x, y, z = individual
+    return 1.0 / (1.0 + (x-2)**2 + (y+1)**2 + (z-1)**2),
 
-    kmeans.fit(Data)
+def create_toolbox():
+    creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+    creator.create("Individual", list, fitness=creator.FitnessMax)
+    toolbox = base.Toolbox()
 
-    step_size = 0.01
+    toolbox.register("attr_float", random.uniform, -5, 5)
 
-    x_vals, y_vals = np.meshgrid(np.arange(x_min, x_max, step_size),
-                                 np.arange(y_min, y_max, step_size))
+    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_float, n=CHROMOSOME_LENGTH)
 
-    output = kmeans.predict(np.c_[x_vals.ravel(), y_vals.ravel()])
+    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-    output = output.reshape(x_vals.shape)
-    plt.figure()
-    plt.clf()
-    plt.imshow(output, interpolation="nearest",
-               extent=(x_vals.min(), x_vals.max(),
-                       y_vals.min(), y_vals.max()),
-               cmap=plt.cm.Paired,
-               aspect="auto",
-               origin="lower")
+    toolbox.register("evaluate", eval_func)
 
-    plt.scatter(Data[:, 0], Data[:, 1], marker="o", facecolors="none",
-                edgecolors="black", s=80)
+    toolbox.register("mate", tools.cxTwoPoint)
+    toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1)
 
-    cluster_centers = kmeans.cluster_centers_
-    plt.scatter(cluster_centers[:, 0], cluster_centers[:, 1],
-                marker="o", s=210, linewidths=4, color="black",
-                zorder=12, facecolors="black")
+    toolbox.register("select", tools.selTournament, tournsize=3)
 
-    plt.title("Кордони кластерів")
-    plt.xlim(x_min, x_max)
-    plt.ylim(y_min, y_max)
-    plt.xticks(())
-    plt.yticks(())
-    plt.show()
+    return toolbox
+
+random.seed(RANDOM_SEED)
+toolbox = create_toolbox()
+population = toolbox.population(n=POPULATION_SIZE)
+
+hall_of_fame = tools.HallOfFame(HALL_OF_FAME_SIZE)
 
 
-def countOfClustersByUsingMeanShift(file, qntl):
-    bandwidth_file = estimate_bandwidth(file, quantile=qntl, n_samples=len(file))
+stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
+stats_size = tools.Statistics(len)
 
-    meanshift_model = MeanShift(bandwidth=bandwidth_file, bin_seeding=True)
-    meanshift_model.fit(file)
+mstats = tools.MultiStatistics(fitness=stats_fit, size=stats_size)
 
-    cluster_centers = meanshift_model.cluster_centers_
-    print("\nКоординати центрів кластерів:\n", cluster_centers)
+mstats.register("avg", np.mean)
+mstats.register("min", np.min)
+mstats.register("max", np.max)
 
-    labels = meanshift_model.labels_
-    num_clusters = len(np.unique(labels))
-    print("\nКількість кластерів у вхідних даних= ", num_clusters)
+population, logbook = algorithms.eaSimple(population, toolbox, cxpb=P_CROSSOVER, mutpb=P_MUTATION,
+                                          ngen=MAX_GENERATIONS, stats=mstats, halloffame=hall_of_fame, verbose=True)
 
-    plt.figure()
-    markers = "o*xvsd+.Xp"
-    for i, marker in zip(range(num_clusters), markers):
-        plt.scatter(file[labels == i, 0], file[labels == i, 1], marker=marker,
-                    color="black")
-
-        cluster_center = cluster_centers[i]
-        plt.plot(cluster_center[0], cluster_center[1], marker="o",
-                 markerfacecolor="red", markeredgecolor="black",
-                 markersize=15)
-
-    plt.title("Кластери")
-    plt.show()
-
-
-def getQualityOfClustering(file):
-    scores = []
-    values = np.arange(2, 15)
-
-    for num_clusters in values:
-        kmeans = KMeans(init="k-means++", n_clusters=num_clusters, n_init=10)
-
-        kmeans.fit(file)
-
-        score = metrics.silhouette_score(file, kmeans.labels_,
-                                         metric="euclidean",
-                                         sample_size=len(file))
-        print("\nКількість кластерів = ", num_clusters)
-        print("Силуетна оцінка = ", score)
-        scores.append(score)
-
-    plt.figure()
-    plt.bar(values, scores, width=0.7, color="black", align="center")
-    plt.title("Залежність силуетної оцінки від кількості кластерів")
-
-    num_clusters = np.argmax(scores) + values[0]
-    print("\nОптимальна кількість кластерів = ", num_clusters)
-
-    plt.figure()
-    plt.scatter(file[:, 0], file[:, 1],
-                color="black",
-                s=80,
-                marker="o",
-                facecolor="none")
-
-    x_min, x_max = file[:, 0].min() - 1, file[:, 0].max() + 1
-    y_min, y_max = file[:, 1].min() - 1, file[:, 1].max() + 1
-
-    plt.title("Вхідні дані")
-    plt.xlim(x_min, x_max)
-    plt.ylim(y_min, y_max)
-    plt.xticks(())
-    plt.yticks(())
-
-    plt.show()
-    return num_clusters
-
-
-# data = np.loadtxt("data_clustering.txt", delimiter=",")
-# quantile = 0.1
-
-
-data = np.array(pd.read_csv("lab01.csv", delimiter=";"))
-quantile = 0.14
-
-# data = np.loadtxt("data_quality.txt", delimiter=",")
-
-
-countOfClustersByUsingMeanShift(data, quantile)
-num_clusters = getQualityOfClustering(data)
-clusteringByKmeans(data, num_clusters)
-
+best_individual = hall_of_fame[0]
+best_fitness = eval_func(best_individual)[0]
+print("\nBest individual:", best_individual)
+print("Best fitness:", best_fitness)
