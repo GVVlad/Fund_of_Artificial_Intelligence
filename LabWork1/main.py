@@ -136,6 +136,7 @@ quantile = 0.14
 # data = np.loadtxt("data_quality.txt", delimiter=",")
 
 
-countOfClustersByUsingMeanShift(data, quantile)
-num_clusters = getQualityOfClustering(data)
-clusteringByKmeans(data, num_clusters)
+if __name__ == "__main__":
+    countOfClustersByUsingMeanShift(data, quantile)
+    num_clusters = getQualityOfClustering(data)
+    clusteringByKmeans(data, num_clusters)
