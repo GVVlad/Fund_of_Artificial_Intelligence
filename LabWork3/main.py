@@ -74,4 +74,3 @@ print("\nCorrect answers : {} \nIncorrect : {}".format(correct, incorrect))
 print("Percentage of Correct answers : {}%".format(correct*100/(correct+incorrect)))
 
 print("Percentage of Incorrect answers : {}%".format(incorrect*100/(correct+incorrect)))
-
