@@ -1,7 +1,7 @@
 import numpy as np
 
 import cv2
-
+import zipfile
 from keras.layers import Input, Dense
 from keras import Model
 from keras.losses import sparse_categorical_crossentropy
@@ -9,12 +9,13 @@ from keras.metrics import sparse_categorical_accuracy
 from keras.optimizers import Adam
 
 import pandas as pd
+zip_file = zipfile.ZipFile("Lab03.zip")
 
-train = pd.read_csv("mnist_test.csv").values
+train = pd.read_csv(zip_file.open("mnist_test.csv")).values
 Y_train = train[:, 0]
 X_train = train[:, 1:]
 
-test = pd.read_csv("mnist_test.csv").values
+test = pd.read_csv(zip_file.open("mnist_test.csv")).values
 Y_test = test[:, 0]
 X_test = test[:, 1:]
 
@@ -70,5 +71,5 @@ for real, predicted, img in zip(Y_test, pdc, X_test):
         cv2.waitKey(0)
 
 print("\nCorrect answers : {} \nIncorrect : {}".format(correct, incorrect))
-print("Percentage of Correct answers : {}%".format(correct*100/(correct+incorrect)))
-print("Percentage of Incorrect answers : {}%".format(incorrect*100/(correct+incorrect)))
+print("Percentage of Correct answers : {}%".format(correct * 100 / (correct + incorrect)))
+print("Percentage of Incorrect answers : {}%".format(incorrect * 100 / (correct + incorrect)))
